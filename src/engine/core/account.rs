@@ -25,13 +25,10 @@ impl Account {
     }
 
     pub fn to_csv(&self) -> String {
+        let total = self.available + self.held;
         format!(
             "{},{:.4},{:.4},{:.4},{}",
-            *self.client_id,
-            self.available,
-            self.held + self.available,
-            self.held,
-            self.locked
+            *self.client_id, self.available, self.held, total, self.locked
         )
     }
 

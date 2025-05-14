@@ -10,6 +10,18 @@ pub struct TransactionDTO {
     pub amount: Option<f32>,
 }
 
+pub struct Adjustment {
+    pub category: AdjustmentKind,
+    pub details: TxDetails,
+    pub amount: TxAmount,
+}
+
+pub struct DisputeClaim {
+    pub client_id: ClientId,
+    pub kind: AdjustmentKind,
+    pub amount: TxAmount,
+}
+
 #[derive(Clone, Copy, Debug, strum::EnumString)]
 #[strum(serialize_all = "camelCase")]
 pub enum TxKind {
@@ -31,6 +43,10 @@ pub enum ResolutionKind {
     Resolve,
     Chargeback,
 }
+pub struct TxDetails {
+    pub id: TransactionId,
+    pub client_id: ClientId,
+}
 
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TransactionId(pub u32);
@@ -38,25 +54,8 @@ pub struct TransactionId(pub u32);
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ClientId(pub u16);
 
-pub struct Adjustment {
-    pub category: AdjustmentKind,
-    pub details: TxDetails,
-    pub amount: TxAmount,
-}
-
 #[derive(Clone, Copy)]
 pub struct TxAmount(pub f32);
-
-pub struct TxDetails {
-    pub id: TransactionId,
-    pub client_id: ClientId,
-}
-
-pub struct DisputeClaim {
-    pub client_id: ClientId,
-    pub kind: AdjustmentKind,
-    pub amount: TxAmount,
-}
 
 impl Deref for ClientId {
     type Target = u16;
