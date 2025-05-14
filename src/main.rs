@@ -43,9 +43,9 @@ fn parse_input_line(line: String) -> anyhow::Result<TransactionDTO> {
             let kind_str = linesplit[0].trim();
             TxKind::from_str(kind_str)?
         },
-        amount: Some({
-            let amount_str = linesplit[3].trim();
-            amount_str.parse()?
-        }),
+        amount: {
+            let amount_str = linesplit.iter().nth(3);
+            amount_str.map(|e| e.trim().parse::<f32>().ok()).flatten()
+        },
     })
 }
