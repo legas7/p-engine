@@ -21,4 +21,6 @@ For prototyping anyhow crate was used, but without much effort it should be chan
 ### Concurency
 Currently program operates on two tokio tasks. One is responsible reading (streaming) transactions from file. Second is doing main processing loop inside `ProcessorImpl` struct. 
 
-Adding horizontal scaling should not be complicated, as `ProcessorImpl` is organized around message passing.
+Program can be scaled horizontally by implementing e.g. `Balancer` component that would create pool of `ProcessorImpl` instances and forward user's transaction always to the same instance.
+
+There is no limit on how many transaction streams or processing loops can be spawned.
