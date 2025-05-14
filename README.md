@@ -1,10 +1,24 @@
 # p-engine
 
-I tried to achieve program correctness as much as I could through rust typesystem.
+
+## Overview
+Much of program correctness is provided by typesystem rather by explicit checks/guards.
 
 `TransactionDTO` -> `Adjustment` (if deposit or withdraw) or `DisputeClaim` (if dispute). Dispute can be closed with `Resolution` (resolve or chargeback).
 
+
+## Testing
 Basic use cases are covered by rust (unit) tests. Bigger rust test suite was not implemented due to time constraints, but is a must in a production system.
 
 File IO was tested on minimal sample to make sure csv parsing works.
 
+
+## Improvements
+
+### Error handling
+For prototyping anyhow crate was used, but without much effort it should be changed for dedicated `enum EngineError` type. This would greatly improve edge-case readability and testability.
+
+### Concurency
+Currently program operates on two tokio tasks. One is responsible reading (streaming) transactions from file. Second is doing main processing loop inside `ProcessorImpl` struct. 
+
+Adding horizontal scaling should not be complicated, as `ProcessorImpl` is organized around message passing.
