@@ -2,7 +2,7 @@ use std::ops::{AddAssign, Deref, SubAssign};
 
 use anyhow::{Context, anyhow};
 
-#[derive(Clone)]
+#[derive(Clone, Debug)]
 pub struct TransactionDTO {
     pub id: TransactionId,
     pub client_id: ClientId,
@@ -10,7 +10,8 @@ pub struct TransactionDTO {
     pub amount: Option<f32>,
 }
 
-#[derive(Clone, Copy)]
+#[derive(Clone, Copy, Debug, strum::EnumString)]
+#[strum(serialize_all = "camelCase")]
 pub enum TxKind {
     Deposit,
     Withdrawal,
@@ -34,7 +35,7 @@ pub enum ResolutionKind {
 #[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct TransactionId(pub u32);
 
-#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+#[derive(Clone, Copy, Debug, Eq, Hash, PartialEq)]
 pub struct ClientId(pub u16);
 
 pub struct Adjustment {

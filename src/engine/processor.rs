@@ -5,22 +5,19 @@ use tokio::{
     task::JoinHandle,
 };
 
-use crate::engine::{
-    account::Account,
-    transactions::{ClientId, TransactionDTO, TransactionId, TxKind},
-};
+use crate::engine::objects::{ClientId, TransactionDTO, TransactionId, TxKind};
 
-use super::tx_resolver::TxResolver;
+use super::core::{account::Account, tx_resolver::TxResolver};
 
 type TransactionStatus = (TransactionId, ProcessingResult);
 
-#[derive(Debug)]
-enum ProcessingResult {
+#[allow(dead_code)]
+pub enum ProcessingResult {
     Success,
     Error(anyhow::Error),
 }
 
-struct ProcessorImpl {
+pub struct ProcessorImpl {
     accounts: HashMap<ClientId, Account>,
     resolver: TxResolver,
 }
@@ -48,9 +45,16 @@ impl ProcessorImpl {
                     }
                 }
             }
+            processor.print_account_balances_to_stdout();
         });
 
         (receiver, handle)
+    }
+
+    fn print_account_balances_to_stdout(&self) {
+        for account in self.accounts.values() {
+            println!("{}", account.to_csv());
+        }
     }
 
     fn process(&mut self, tx: TransactionDTO) -> anyhow::Result<()> {
@@ -75,8 +79,8 @@ mod tests {
     use tokio::sync::mpsc;
 
     use crate::engine::{
-        core::processor::{ProcessingResult, ProcessorImpl, TransactionStatus},
-        transactions::{ClientId, TransactionDTO, TransactionId, TxKind},
+        objects::{ClientId, TransactionDTO, TransactionId, TxKind},
+        processor::{ProcessingResult, ProcessorImpl, TransactionStatus},
     };
 
     #[tokio::test]
@@ -178,7 +182,6 @@ mod tests {
             sender.send(transaction.0).unwrap();
             let (id, res) = results.recv().await.unwrap();
 
-            println!("result: {res:?}, expect: {expect_res:?}");
             assert_eq!(id, expect_id);
             assert_eq!(discriminant(&res), discriminant(&expect_res));
         }

@@ -1,6 +1,6 @@
 use std::ops::Deref;
 
-use crate::engine::transactions::{
+use crate::engine::objects::{
     Adjustment, AdjustmentKind, ClientId, DisputeClaim, ResolutionKind, TransactionDTO,
     TransactionId,
 };
@@ -24,6 +24,13 @@ impl Account {
             total: 0.0,
             locked: false,
         }
+    }
+
+    pub fn to_csv(&self) -> String {
+        format!(
+            "{},{:.4},{:.4},{:.4},{}",
+            *self.client_id, self.available, self.held, self.total, self.locked
+        )
     }
 
     pub fn apply_adjustment(&mut self, tx: TransactionDTO) -> anyhow::Result<Adjustment> {
@@ -100,11 +107,9 @@ impl Account {
             }
             (AdjustmentKind::Deposit, ResolutionKind::Chargeback) => {
                 let new_total = self.total - *amount;
-                println!("new_total: {new_total}");
                 if new_total < 0.0 {
                     return Err(anyhow!("Not enough funds"));
                 }
-                // self.available
                 self.total = new_total;
                 self.held -= *amount;
                 self.locked = true;
@@ -132,9 +137,8 @@ impl Account {
 
 #[cfg(test)]
 mod tests {
-    use crate::engine::transactions::{
-        AdjustmentKind, ClientId, DisputeClaim, ResolutionKind, TransactionDTO, TransactionId,
-        TxAmount, TxDetails, TxKind,
+    use crate::engine::objects::{
+        AdjustmentKind, ClientId, DisputeClaim, TransactionDTO, TransactionId, TxAmount, TxKind,
     };
 
     use super::Account;

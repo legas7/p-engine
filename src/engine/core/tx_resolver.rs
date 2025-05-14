@@ -2,10 +2,9 @@ use std::collections::HashMap;
 
 use anyhow::anyhow;
 
-use crate::engine::{
-    account::Account,
-    transactions::{Adjustment, DisputeClaim, TransactionDTO, TransactionId},
-};
+use crate::engine::objects::{Adjustment, DisputeClaim, TransactionDTO, TransactionId};
+
+use super::account::Account;
 
 pub struct TxResolver {
     transaction_log: HashMap<TransactionId, Adjustment>,
@@ -70,8 +69,8 @@ impl TxResolver {
 #[cfg(test)]
 mod tests {
     use crate::engine::{
-        account::Account,
-        transactions::{ClientId, TransactionDTO, TransactionId, TxKind},
+        core::account::Account,
+        objects::{ClientId, TransactionDTO, TransactionId, TxKind},
     };
 
     use super::TxResolver;
