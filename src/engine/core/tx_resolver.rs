@@ -79,7 +79,6 @@ mod tests {
     fn opening_dispute_for_missing_transaction_fails() {
         let mut account = Account {
             available: 100.0,
-            total: 100.0,
             ..Account::new(ClientId(1))
         };
         let tx = TransactionDTO {
@@ -97,7 +96,6 @@ mod tests {
     fn opening_new_dispute_for_already_disputed_transaction_fails() {
         let mut account = Account {
             available: 100.0,
-            total: 100.0,
             ..Account::new(ClientId(1))
         };
         let tx0 = TransactionDTO {
@@ -123,7 +121,6 @@ mod tests {
     fn closing_not_disputed_transaction_fails() {
         let mut account = Account {
             available: 100.0,
-            total: 100.0,
             ..Account::new(ClientId(1))
         };
         let tx0 = TransactionDTO {
@@ -182,7 +179,6 @@ mod tests {
         // opening dispute regardless of account balance
         assert!(resolver.open_dispute(&tx0.id, &mut account).is_ok());
         assert_eq!(account.available, -30.0);
-        assert_eq!(account.total, 70.0);
         assert_eq!(account.held, 100.0);
 
         // can't chargeback dispute due to insufficient funds
@@ -198,7 +194,6 @@ mod tests {
         // dispute can be charged back when funds are available
         assert!(resolver.close_dispute(tx0_chargeback, &mut account).is_ok());
         assert_eq!(account.available, 30.0);
-        assert_eq!(account.total, 30.0);
         assert_eq!(account.held, 0.0);
     }
 }

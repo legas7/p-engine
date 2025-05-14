@@ -11,7 +11,6 @@ pub struct Account {
     pub client_id: ClientId,
     pub available: f32, // for trading
     pub held: f32,      // for disputes
-    pub total: f32,     // available + held
     pub locked: bool,
 }
 
@@ -21,7 +20,6 @@ impl Account {
             client_id,
             available: 0.0,
             held: 0.0,
-            total: 0.0,
             locked: false,
         }
     }
@@ -29,7 +27,11 @@ impl Account {
     pub fn to_csv(&self) -> String {
         format!(
             "{},{:.4},{:.4},{:.4},{}",
-            *self.client_id, self.available, self.held, self.total, self.locked
+            *self.client_id,
+            self.available,
+            self.held + self.available,
+            self.held,
+            self.locked
         )
     }
 
@@ -40,13 +42,11 @@ impl Account {
         match adjustment.category {
             AdjustmentKind::Deposit => {
                 self.available += amount;
-                self.total += amount;
             }
             AdjustmentKind::Withdrawal => {
                 let new_balance = self.available - amount;
                 if new_balance >= 0.0f32 {
                     self.available = new_balance;
-                    self.total -= amount;
                 } else {
                     return Err(anyhow!("Not enough funds"));
                 }
@@ -106,17 +106,15 @@ impl Account {
                 self.held -= *amount;
             }
             (AdjustmentKind::Deposit, ResolutionKind::Chargeback) => {
-                let new_total = self.total - *amount;
-                if new_total < 0.0 {
+                let total = self.held + self.available;
+                if *amount > total {
                     return Err(anyhow!("Not enough funds"));
                 }
-                self.total = new_total;
                 self.held -= *amount;
                 self.locked = true;
             }
             (AdjustmentKind::Withdrawal, ResolutionKind::Chargeback) => {
                 self.available += *amount;
-                self.total += *amount
             }
             (AdjustmentKind::Withdrawal, ResolutionKind::Resolve) => {
                 // no provisional refunds were made when opening a dispute, so it's a no-op
@@ -165,7 +163,6 @@ mod tests {
     fn withdrawal_fails_when_insufficient_funds() {
         let mut account = Account {
             available: 100.0,
-            total: 100.0,
             ..Account::new(ClientId(1))
         };
         let tx = TransactionDTO {
@@ -179,7 +176,6 @@ mod tests {
 
         assert!(res.is_err());
         assert_eq!(account.available, 100.0);
-        assert_eq!(account.total, 100.0);
         assert_eq!(account.held, 0.0);
     }
 
@@ -187,7 +183,6 @@ mod tests {
     fn dispute_on_deposit_blocks_funds() {
         let mut account = Account {
             available: 100.0,
-            total: 100.0,
             ..Account::new(ClientId(1))
         };
         let tx = TransactionDTO {
@@ -200,14 +195,12 @@ mod tests {
         let adjustment = account.apply_adjustment(tx).unwrap();
 
         assert_eq!(account.available, 150.0);
-        assert_eq!(account.total, 150.0);
         assert_eq!(account.held, 0.0);
 
         let res = account.open_dispute(&adjustment);
 
         assert!(res.is_ok());
         assert_eq!(account.available, 100.0);
-        assert_eq!(account.total, 150.0);
         assert_eq!(account.held, 50.0);
     }
 
@@ -215,7 +208,6 @@ mod tests {
     fn resolution_on_disputed_deposit_unblocks_funds() {
         let mut account = Account {
             available: 100.0,
-            total: 200.0,
             held: 100.0,
             ..Account::new(ClientId(1))
         };
@@ -236,7 +228,6 @@ mod tests {
 
         assert!(res.is_ok());
         assert_eq!(account.available, 150.0);
-        assert_eq!(account.total, 200.0);
         assert_eq!(account.held, 50.0);
     }
 
@@ -244,7 +235,6 @@ mod tests {
     fn chargeback_on_disputed_deposit_decreases_funds() {
         let mut account = Account {
             available: 100.0,
-            total: 200.0,
             held: 100.0,
             ..Account::new(ClientId(1))
         };
@@ -267,7 +257,6 @@ mod tests {
         assert!(res.is_ok());
         assert!(account.locked);
         assert_eq!(account.available, 100.0);
-        assert_eq!(account.total, 150.0);
         assert_eq!(account.held, 50.0);
     }
 
@@ -275,7 +264,6 @@ mod tests {
     fn deposit_and_withdraw_are_processed_succesfully() {
         let mut account = Account {
             available: 100.0,
-            total: 100.0,
             ..Account::new(ClientId(1))
         };
         let tx0 = TransactionDTO {
@@ -294,13 +282,11 @@ mod tests {
         let _adjustment = account.apply_adjustment(tx0).unwrap();
 
         assert_eq!(account.available, 150.0);
-        assert_eq!(account.total, 150.0);
         assert_eq!(account.held, 0.0);
 
         let _adjustment = account.apply_adjustment(tx1).unwrap();
 
         assert_eq!(account.available, 100.0);
-        assert_eq!(account.total, 100.0);
         assert_eq!(account.held, 0.0);
     }
 }

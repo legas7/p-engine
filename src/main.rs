@@ -23,6 +23,7 @@ async fn main() {
             _ = t_sender.send(res)
         }
     }
+    // dropping sender so 'ProcessorImpl' would gracefully shut down after processing whole input
     drop(t_sender);
 
     handle.await.unwrap();
@@ -44,8 +45,8 @@ fn parse_input_line(line: String) -> anyhow::Result<TransactionDTO> {
             TxKind::from_str(kind_str)?
         },
         amount: {
-            let amount_str = linesplit.iter().nth(3);
-            amount_str.map(|e| e.trim().parse::<f32>().ok()).flatten()
+            let amount_str = linesplit.get(3);
+            amount_str.and_then(|e| e.trim().parse::<f32>().ok())
         },
     })
 }
