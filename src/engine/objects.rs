@@ -1,6 +1,7 @@
 use std::ops::{AddAssign, Deref, SubAssign};
 
-use anyhow::{Context, anyhow};
+
+use super::EngineError;
 
 #[derive(Clone, Debug)]
 pub struct TransactionDTO {
@@ -94,7 +95,7 @@ impl Deref for TxAmount {
 }
 
 impl TryFrom<TransactionDTO> for Adjustment {
-    type Error = anyhow::Error;
+    type Error = EngineError;
 
     fn try_from(value: TransactionDTO) -> Result<Self, Self::Error> {
         Ok(Adjustment {
@@ -103,37 +104,35 @@ impl TryFrom<TransactionDTO> for Adjustment {
                 id: value.id,
                 client_id: value.client_id,
             },
-            amount: TxAmount(value.amount.context(
-                "Missing 'amount' field in TransactionDTO. Cannot construct Adjustment",
-            )?),
+            amount: TxAmount(
+                value
+                    .amount
+                    .ok_or(EngineError::Parsing_MissingAmountFieldConstructingAdjustment)?,
+            ),
         })
     }
 }
 
 impl TryFrom<TxKind> for AdjustmentKind {
-    type Error = anyhow::Error;
+    type Error = EngineError;
 
     fn try_from(value: TxKind) -> Result<Self, Self::Error> {
         match value {
             TxKind::Deposit => Ok(AdjustmentKind::Deposit),
             TxKind::Withdrawal => Ok(AdjustmentKind::Withdrawal),
-            _ => Err(anyhow!(
-                "Tried to construct AdjustmentType from incompatibile TransactionType"
-            )),
+            _ => Err(EngineError::Parsing_TryingToConstructAdjustmentFromIncompatibileTransaction),
         }
     }
 }
 
 impl TryFrom<TxKind> for ResolutionKind {
-    type Error = anyhow::Error;
+    type Error = EngineError;
 
     fn try_from(value: TxKind) -> Result<Self, Self::Error> {
         match value {
             TxKind::Chargeback => Ok(ResolutionKind::Chargeback),
             TxKind::Resolve => Ok(ResolutionKind::Resolve),
-            _ => Err(anyhow!(
-                "Tried to construct DisputeType from incompatibile TransactionType"
-            )),
+            _ => Err(EngineError::Parsing_TryingToConstructDisputeFromIncompatibileTransaction),
         }
     }
 }

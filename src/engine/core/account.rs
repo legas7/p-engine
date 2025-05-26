@@ -1,11 +1,13 @@
 use std::ops::Deref;
 
-use crate::engine::objects::{
-    Adjustment, AdjustmentKind, ClientId, DisputeClaim, ResolutionKind, TransactionDTO,
-    TransactionId,
+use crate::engine::{
+    EngineError,
+    objects::{
+        Adjustment, AdjustmentKind, ClientId, DisputeClaim, ResolutionKind, TransactionDTO,
+        TransactionId,
+    },
 };
 
-use anyhow::anyhow;
 
 pub struct Account {
     pub client_id: ClientId,
@@ -32,7 +34,7 @@ impl Account {
         )
     }
 
-    pub fn apply_adjustment(&mut self, tx: TransactionDTO) -> anyhow::Result<Adjustment> {
+    pub fn apply_adjustment(&mut self, tx: TransactionDTO) -> Result<Adjustment, EngineError> {
         self.check_account_lock()?;
         let adjustment: Adjustment = tx.try_into()?;
         let amount = adjustment.amount.deref();
@@ -45,7 +47,7 @@ impl Account {
                 if new_balance >= 0.0f32 {
                     self.available = new_balance;
                 } else {
-                    return Err(anyhow!("Not enough funds"));
+                    return Err(EngineError::Account_NotEnoughFunds);
                 }
             }
         }
@@ -55,12 +57,10 @@ impl Account {
     pub fn open_dispute(
         &mut self,
         disputed_adjustment: &Adjustment,
-    ) -> anyhow::Result<DisputeClaim> {
+    ) -> Result<DisputeClaim, EngineError> {
         self.check_account_lock()?;
         if self.client_id != disputed_adjustment.details.client_id {
-            return Err(anyhow!(
-                "Dispute references different client_id than adjustment transaction"
-            ));
+            return Err(EngineError::Account_DisputeReferencesDifferentClient_OnCreation);
         }
 
         let amount = disputed_adjustment.amount.deref();
@@ -87,14 +87,12 @@ impl Account {
         tx_id: &TransactionId,
         tx_client_id: &ClientId,
         resolution_category: &ResolutionKind,
-    ) -> anyhow::Result<TransactionId> {
+    ) -> Result<TransactionId, EngineError> {
         self.check_account_lock()?;
         let amount = claim.amount;
 
         if &claim.client_id != tx_client_id {
-            return Err(anyhow!(
-                "Dispute references different client_id than resolution transaction"
-            ));
+            return Err(EngineError::Account_DisputeReferencesDifferentClient_OnResolution);
         }
 
         match (claim.kind, resolution_category) {
@@ -105,7 +103,7 @@ impl Account {
             (AdjustmentKind::Deposit, ResolutionKind::Chargeback) => {
                 let total = self.held + self.available;
                 if *amount > total {
-                    return Err(anyhow!("Not enough funds"));
+                    return Err(EngineError::Account_NotEnoughFunds);
                 }
                 self.held -= *amount;
                 self.locked = true;
@@ -121,9 +119,9 @@ impl Account {
         Ok(*tx_id)
     }
 
-    fn check_account_lock(&self) -> anyhow::Result<()> {
+    fn check_account_lock(&self) -> Result<(), EngineError> {
         if self.locked {
-            Err(anyhow!("Account locked"))
+            Err(EngineError::Account_AccountLocked)
         } else {
             Ok(())
         }

@@ -1,8 +1,10 @@
 use std::collections::HashMap;
 
-use anyhow::anyhow;
 
-use crate::engine::objects::{Adjustment, DisputeClaim, TransactionDTO, TransactionId};
+use crate::engine::{
+    EngineError,
+    objects::{Adjustment, DisputeClaim, TransactionDTO, TransactionId},
+};
 
 use super::account::Account;
 
@@ -23,7 +25,7 @@ impl TxResolver {
         &mut self,
         tx: TransactionDTO,
         account: &mut Account,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), EngineError> {
         account.apply_adjustment(tx).map(|applied_adjustment| {
             let adjustment_id = applied_adjustment.details.id;
             self.transaction_log
@@ -35,18 +37,18 @@ impl TxResolver {
         &mut self,
         tx_id: &TransactionId,
         account: &mut Account,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), EngineError> {
         match self.transaction_log.get(tx_id) {
             Some(disputed_tx) => {
                 if self.active_disputes.contains_key(&disputed_tx.details.id) {
-                    return Err(anyhow!("Transaction currently under dispute"));
+                    return Err(EngineError::Resolver_TransactionAlreadyUnderDispute);
                 }
 
                 account.open_dispute(disputed_tx).map(|claim| {
                     self.active_disputes.insert(disputed_tx.details.id, claim);
                 })
             }
-            None => Err(anyhow!("Transaction not found")),
+            None => Err(EngineError::Resolver_TransactionNotFound),
         }
     }
 
@@ -54,14 +56,14 @@ impl TxResolver {
         &mut self,
         tx: TransactionDTO,
         account: &mut Account,
-    ) -> anyhow::Result<()> {
+    ) -> Result<(), EngineError> {
         match self.active_disputes.get(&tx.id) {
             Some(disputed_tx) => account
                 .resolve_dispute(disputed_tx, &tx.id, &tx.client_id, &tx.kind.try_into()?)
                 .map(|resolved_tx_id| {
                     self.active_disputes.remove(&resolved_tx_id);
                 }),
-            None => Err(anyhow!("Transaction not under dispute")),
+            None => Err(EngineError::Resolver_TransactionNotUnderDispute),
         }
     }
 }

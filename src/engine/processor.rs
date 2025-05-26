@@ -7,14 +7,17 @@ use tokio::{
 
 use crate::engine::objects::{ClientId, TransactionDTO, TransactionId, TxKind};
 
-use super::core::{account::Account, tx_resolver::TxResolver};
+use super::{
+    EngineError,
+    core::{account::Account, tx_resolver::TxResolver},
+};
 
 type TransactionStatus = (TransactionId, ProcessingResult);
 
 #[allow(dead_code)]
 pub enum ProcessingResult {
     Success,
-    Error(anyhow::Error),
+    Error(EngineError),
 }
 
 pub struct ProcessorImpl {
@@ -57,7 +60,7 @@ impl ProcessorImpl {
         }
     }
 
-    fn process(&mut self, tx: TransactionDTO) -> anyhow::Result<()> {
+    fn process(&mut self, tx: TransactionDTO) -> Result<(), EngineError> {
         let account = self
             .accounts
             .entry(tx.client_id)
@@ -75,10 +78,11 @@ impl ProcessorImpl {
 mod tests {
     use std::mem::discriminant;
 
-    use anyhow::anyhow;
+    
     use tokio::sync::mpsc;
 
     use crate::engine::{
+        EngineError,
         objects::{ClientId, TransactionDTO, TransactionId, TxKind},
         processor::{ProcessingResult, ProcessorImpl, TransactionStatus},
     };
@@ -134,7 +138,7 @@ mod tests {
                 },
                 (
                     TransactionId(100),
-                    ProcessingResult::Error(anyhow!("Transaction not under dispute")),
+                    ProcessingResult::Error(EngineError::Resolver_TransactionNotUnderDispute),
                 ),
             ),
             (
@@ -155,7 +159,7 @@ mod tests {
                 },
                 (
                     TransactionId(4),
-                    ProcessingResult::Error(anyhow!("Not enough funds")),
+                    ProcessingResult::Error(EngineError::Account_NotEnoughFunds),
                 ),
             ),
             (
@@ -167,7 +171,7 @@ mod tests {
                 },
                 (
                     TransactionId(500),
-                    ProcessingResult::Error(anyhow!("Transaction not found")),
+                    ProcessingResult::Error(EngineError::Resolver_TransactionNotFound),
                 ),
             ),
         ]

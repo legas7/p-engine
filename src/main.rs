@@ -1,4 +1,4 @@
-use std::{env, str::FromStr};
+use std::{env, error::Error, str::FromStr};
 
 use engine::{
     objects::{ClientId, TransactionDTO, TransactionId, TxKind},
@@ -29,7 +29,7 @@ async fn main() {
     handle.await.unwrap();
 }
 
-fn parse_input_line(line: String) -> anyhow::Result<TransactionDTO> {
+fn parse_input_line(line: String) -> Result<TransactionDTO, Box<dyn Error>> {
     let linesplit: Vec<&str> = line.split(',').collect();
     Ok(TransactionDTO {
         id: {

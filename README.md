@@ -1,5 +1,5 @@
 # p-engine
-
+Toy transaction processing engine.
 
 ## Overview
 Much of program correctness is provided by typesystem rather by explicit checks/guards.
@@ -14,9 +14,6 @@ File IO was tested on minimal sample to make sure csv parsing works.
 
 
 ## Improvements
-
-### Error handling
-For prototyping anyhow crate was used, but without much effort it should be changed for dedicated `enum EngineError` type. This would greatly improve edge-case readability and testability.
 
 ### Concurency
 Currently program operates on two tokio tasks. One is responsible reading (streaming) transactions from file. Second is doing main processing loop inside `ProcessorImpl` struct. 
