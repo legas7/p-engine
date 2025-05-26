@@ -12,7 +12,7 @@ use super::{
     core::{account::Account, tx_resolver::TxResolver},
 };
 
-type TransactionError = (TransactionId, Option<EngineError>);
+pub type TransactionError = (TransactionId, Option<EngineError>);
 
 #[allow(dead_code)]
 pub enum ProcessingResult {
@@ -23,17 +23,21 @@ pub enum ProcessingResult {
 pub struct ProcessorImpl {
     accounts: HashMap<ClientId, Account>,
     resolver: TxResolver,
+    #[allow(dead_code)]
+    instance_id: u16,
 }
 
 impl ProcessorImpl {
     pub fn run(
         mut rx: UnboundedReceiver<TransactionDTO>,
+        instance_id: u16,
     ) -> (UnboundedReceiver<TransactionError>, JoinHandle<()>) {
         let (sender, receiver) = mpsc::unbounded_channel::<TransactionError>();
         let handle = tokio::spawn(async move {
             let mut processor = Self {
                 accounts: Default::default(),
                 resolver: TxResolver::new(),
+                instance_id,
             };
 
             while let Some(transaction) = rx.recv().await {
@@ -54,6 +58,7 @@ impl ProcessorImpl {
     }
 
     fn process(&mut self, tx: TransactionDTO) -> Result<(), EngineError> {
+        // println!("Processing transaction on processor: {}", self.instance_id);
         let account = self
             .accounts
             .entry(tx.client_id)
@@ -167,7 +172,7 @@ mod tests {
         .into_iter()
         .collect();
 
-        let (mut results, _handle) = ProcessorImpl::run(receiver);
+        let (mut results, _handle) = ProcessorImpl::run(receiver, 1);
         for transaction in transactions {
             let expect_res = transaction.1.1;
             let expect_id = transaction.1.0;

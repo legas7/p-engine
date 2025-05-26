@@ -1,6 +1,8 @@
 # p-engine
 Toy transaction processing engine.
 
+Engine processes transactions. Transaction can introduce debit or credit to account. Transaction can be disputed, which opens a dispute. Dispute can be resolved with chargeback or be dropped. Common (banking) sense applies for things not specified.
+
 ## Overview
 Much of program correctness is provided by typesystem rather by explicit checks/guards.
 
@@ -8,16 +10,6 @@ Much of program correctness is provided by typesystem rather by explicit checks/
 
 
 ## Testing
-Basic use cases are covered by rust (unit) tests. Bigger rust test suite was not implemented due to time constraints, but is a must in a production system.
+Basic use cases are covered by rust (unit) tests.
 
 File IO was tested on minimal sample to make sure csv parsing works.
-
-
-## Improvements
-
-### Concurency
-Currently program operates on two tokio tasks. One is responsible reading (streaming) transactions from file. Second is doing main processing loop inside `ProcessorImpl` struct. 
-
-Program can be scaled horizontally by implementing e.g. `Balancer` component that would create pool of `ProcessorImpl` instances and forward user's transaction always to the same instance.
-
-There is no limit on how many transaction streams or processing loops can be spawned.

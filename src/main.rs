@@ -1,10 +1,15 @@
-use std::{env, error::Error, str::FromStr};
+use std::{env, error::Error, ops::Deref, str::FromStr};
 
 use engine::{
     objects::{ClientId, TransactionDTO, TransactionId, TxKind},
     processor::ProcessorImpl,
 };
-use tokio::io::AsyncBufReadExt;
+use futures::{StreamExt, stream::FuturesUnordered};
+use tokio::{
+    io::AsyncBufReadExt,
+    sync::mpsc::{UnboundedReceiver, UnboundedSender},
+    task::JoinHandle,
+};
 
 mod engine;
 
@@ -16,17 +21,43 @@ async fn main() {
     let mut reader = tokio::io::BufReader::new(file).lines();
     let (t_sender, t_receiver) = tokio::sync::mpsc::unbounded_channel::<TransactionDTO>();
 
-    let (_processing_results, handle) = ProcessorImpl::run(t_receiver);
-
     while let Ok(Some(line)) = reader.next_line().await {
         if let Ok(res) = parse_input_line(line) {
             _ = t_sender.send(res)
         }
     }
-    // dropping sender so 'ProcessorImpl' would gracefully shut down after processing whole input
+    // In streaming input scenario (not file) this should be dropped when service receives shutdown signal
+    // It would provide graceful shutdown to all processing units
     drop(t_sender);
 
-    handle.await.unwrap();
+    run_scaled(2, t_receiver).await;
+}
+
+async fn run_scaled(instance_count: u16, mut rx: UnboundedReceiver<TransactionDTO>) {
+    let mut senders: Vec<UnboundedSender<TransactionDTO>> = Vec::new();
+    let mut handles: Vec<JoinHandle<()>> = Vec::new();
+
+    for i in 0..instance_count {
+        let (t_sender, t_receiver) = tokio::sync::mpsc::unbounded_channel::<TransactionDTO>();
+        let proc_handle = ProcessorImpl::run(t_receiver, i);
+        senders.push(t_sender);
+        handles.push(proc_handle.1);
+    }
+
+    while let Some(transaction) = rx.recv().await {
+        let bucket = transaction.client_id.deref() % instance_count;
+        _ = senders[bucket as usize].send(transaction);
+    }
+    // notify instances that all inputs are processed by closing channels' tx end
+    senders.clear();
+
+    // wait till instances finsh work
+    handles
+        .into_iter()
+        .map(async |jh| jh.await)
+        .collect::<FuturesUnordered<_>>()
+        .collect::<Vec<_>>()
+        .await;
 }
 
 fn parse_input_line(line: String) -> Result<TransactionDTO, Box<dyn Error>> {
