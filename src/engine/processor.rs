@@ -12,7 +12,7 @@ use super::{
     core::{account::Account, tx_resolver::TxResolver},
 };
 
-type TransactionStatus = (TransactionId, ProcessingResult);
+type TransactionError = (TransactionId, Option<EngineError>);
 
 #[allow(dead_code)]
 pub enum ProcessingResult {
@@ -28,8 +28,8 @@ pub struct ProcessorImpl {
 impl ProcessorImpl {
     pub fn run(
         mut rx: UnboundedReceiver<TransactionDTO>,
-    ) -> (UnboundedReceiver<TransactionStatus>, JoinHandle<()>) {
-        let (sender, receiver) = mpsc::unbounded_channel::<TransactionStatus>();
+    ) -> (UnboundedReceiver<TransactionError>, JoinHandle<()>) {
+        let (sender, receiver) = mpsc::unbounded_channel::<TransactionError>();
         let handle = tokio::spawn(async move {
             let mut processor = Self {
                 accounts: Default::default(),
@@ -38,15 +38,8 @@ impl ProcessorImpl {
 
             while let Some(transaction) = rx.recv().await {
                 let tx_id = transaction.id;
-                // TODO: nicer result handling
-                match processor.process(transaction) {
-                    Ok(()) => {
-                        _ = sender.send((tx_id, ProcessingResult::Success));
-                    }
-                    Err(e) => {
-                        _ = sender.send((tx_id, ProcessingResult::Error(e)));
-                    }
-                }
+                let result = processor.process(transaction).err();
+                _ = sender.send((tx_id, result));
             }
             processor.print_account_balances_to_stdout();
         });
@@ -78,13 +71,12 @@ impl ProcessorImpl {
 mod tests {
     use std::mem::discriminant;
 
-    
     use tokio::sync::mpsc;
 
     use crate::engine::{
         EngineError,
         objects::{ClientId, TransactionDTO, TransactionId, TxKind},
-        processor::{ProcessingResult, ProcessorImpl, TransactionStatus},
+        processor::{ProcessorImpl, TransactionError},
     };
 
     #[tokio::test]
@@ -92,7 +84,7 @@ mod tests {
         let (sender, receiver) = mpsc::unbounded_channel::<TransactionDTO>();
         let client_id = 1;
 
-        let transactions: Vec<(TransactionDTO, TransactionStatus)> = [
+        let transactions: Vec<(TransactionDTO, TransactionError)> = [
             (
                 TransactionDTO {
                     id: TransactionId(1),
@@ -100,7 +92,7 @@ mod tests {
                     kind: TxKind::Deposit,
                     amount: Some(100.0),
                 },
-                (TransactionId(1), ProcessingResult::Success),
+                (TransactionId(1), None),
             ),
             (
                 TransactionDTO {
@@ -109,7 +101,7 @@ mod tests {
                     kind: TxKind::Withdrawal,
                     amount: Some(50.0),
                 },
-                (TransactionId(2), ProcessingResult::Success),
+                (TransactionId(2), None),
             ),
             (
                 TransactionDTO {
@@ -118,7 +110,7 @@ mod tests {
                     kind: TxKind::Dispute,
                     amount: None,
                 },
-                (TransactionId(2), ProcessingResult::Success),
+                (TransactionId(2), None),
             ),
             (
                 TransactionDTO {
@@ -127,7 +119,7 @@ mod tests {
                     kind: TxKind::Chargeback,
                     amount: None,
                 },
-                (TransactionId(2), ProcessingResult::Success),
+                (TransactionId(2), None),
             ),
             (
                 TransactionDTO {
@@ -138,7 +130,7 @@ mod tests {
                 },
                 (
                     TransactionId(100),
-                    ProcessingResult::Error(EngineError::Resolver_TransactionNotUnderDispute),
+                    Some(EngineError::Resolver_TransactionNotUnderDispute),
                 ),
             ),
             (
@@ -148,7 +140,7 @@ mod tests {
                     kind: TxKind::Withdrawal,
                     amount: Some(70.0),
                 },
-                (TransactionId(3), ProcessingResult::Success),
+                (TransactionId(3), None),
             ),
             (
                 TransactionDTO {
@@ -157,10 +149,7 @@ mod tests {
                     kind: TxKind::Withdrawal,
                     amount: Some(40.0),
                 },
-                (
-                    TransactionId(4),
-                    ProcessingResult::Error(EngineError::Account_NotEnoughFunds),
-                ),
+                (TransactionId(4), Some(EngineError::Account_NotEnoughFunds)),
             ),
             (
                 TransactionDTO {
@@ -171,7 +160,7 @@ mod tests {
                 },
                 (
                     TransactionId(500),
-                    ProcessingResult::Error(EngineError::Resolver_TransactionNotFound),
+                    Some(EngineError::Resolver_TransactionNotFound),
                 ),
             ),
         ]
